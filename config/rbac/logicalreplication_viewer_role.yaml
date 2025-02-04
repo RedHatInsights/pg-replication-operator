@@ -5,6 +5,8 @@ metadata:
   labels:
     app.kubernetes.io/name: pg-replication-operator
     app.kubernetes.io/managed-by: kustomize
+    # Add these permissions to the "view" default role.
+    rbac.authorization.k8s.io/aggregate-to-view: 'true'
   name: logicalreplication-viewer-role
 rules:
 - apiGroups:

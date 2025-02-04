@@ -5,6 +5,10 @@ metadata:
   labels:
     app.kubernetes.io/name: pg-replication-operator
     app.kubernetes.io/managed-by: kustomize
+    # Add these permissions to dedicated cluster administrators.
+    managed.openshift.io/aggregate-to-dedicated-admins: cluster
+    # Add these permissions to the "edit" default role.
+    rbac.authorization.k8s.io/aggregate-to-edit: 'true'
   name: logicalreplication-editor-role
 rules:
 - apiGroups:
