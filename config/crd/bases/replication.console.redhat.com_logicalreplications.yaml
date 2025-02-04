@@ -1,0 +1,82 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.1
+  name: logicalreplications.replication.console.redhat.com
+spec:
+  group: replication.console.redhat.com
+  names:
+    kind: LogicalReplication
+    listKind: LogicalReplicationList
+    plural: logicalreplications
+    singular: logicalreplication
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LogicalReplication is the Schema for the logicalreplications
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: LogicalReplicationSpec defines the desired state of LogicalReplication
+            properties:
+              publication:
+                description: |-
+                  PublicationSpec defines the publisher connection information including
+                  name of the publication and the connection secret.
+                properties:
+                  name:
+                    description: Name of the publication on the publisher's side
+                    type: string
+                  secretName:
+                    description: The secret name of to connect to the publisher's
+                      database
+                    type: string
+                required:
+                - name
+                - secretName
+                type: object
+              subscription:
+                description: SubscriptionSpec defines the datbase where the replication
+                  would be set up.
+                properties:
+                  secretName:
+                    description: |-
+                      The secret name of to connect to the dababase where the replication
+                      would be set up.
+                    type: string
+                required:
+                - secretName
+                type: object
+            required:
+            - publication
+            - subscription
+            type: object
+          status:
+            description: LogicalReplicationStatus defines the observed state of LogicalReplication
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
