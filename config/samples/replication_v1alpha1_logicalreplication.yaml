@@ -1,0 +1,9 @@
+apiVersion: replication.console.redhat.com/v1alpha1
+kind: LogicalReplication
+metadata:
+  labels:
+    app.kubernetes.io/name: pg-replication-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: logicalreplication-sample
+spec:
+  # TODO(user): Add fields here

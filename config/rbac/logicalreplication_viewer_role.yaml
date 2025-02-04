@@ -1,32 +1,23 @@
----
+# permissions for end users to view logicalreplications.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: pg-replication-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: logicalreplication-viewer-role
 rules:
 - apiGroups:
   - replication.console.redhat.com
   resources:
   - logicalreplications
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - replication.console.redhat.com
-  resources:
-  - logicalreplications/finalizers
-  verbs:
-  - update
 - apiGroups:
   - replication.console.redhat.com
   resources:
   - logicalreplications/status
   verbs:
   - get
-  - patch
-  - update
