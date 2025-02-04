@@ -23,3 +23,21 @@ go.work.sum
 
 # env file
 .env
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+
+!vendor/**/zz_generated.*
+bundle/manifests/*
+kubeconfig
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+launch.json
+*.code-workspace
+.vimrc
+.vscode
+.vscode
+__debug_bin
