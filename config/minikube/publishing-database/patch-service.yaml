@@ -1,0 +1,9 @@
+- op: replace
+  path: /metadata/name
+  value: publishing-database
+- op: add
+  path: /metadata/labels/designation
+  value: publishing
+- op: add
+  path: /spec/selector/designation
+  value: publishing

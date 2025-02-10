@@ -1,0 +1,9 @@
+- op: replace
+  path: /metadata/name
+  value: subscribing-datbase
+- op: add
+  path: /metadata/labels/designation
+  value: subscribing
+- op: add
+  path: /spec/selector/designation
+  value: subscribing

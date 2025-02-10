@@ -66,6 +66,33 @@ make uninstall
 make undeploy
 ```
 
+## Development
+
+### Prerequisites
+
+* [Podman](https://podman.io/)
+* [Minikube](https://minikube.sigs.k8s.io/docs/start/)
+  ```
+  curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+  sudo install minikube-linux-amd64 /usr/local/bin/minikube
+  ```
+
+### Environment Setup
+
+To set up the development environment using Minikube, first create and start the Minikube cluster:
+```
+minikube start
+```
+
+Then run:
+```
+make minikube-setup
+```
+
+This would:
+* generate two secret files for two testing datbases under `config/minikube/.secrets`
+* deploy two postrgresql instances (one for publishing the other for subscribing)
+
 ## Project Distribution
 
 Following are the steps to build the installer and distribute this project to users.
