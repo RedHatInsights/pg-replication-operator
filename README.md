@@ -92,6 +92,7 @@ make minikube-setup
 This would:
 * generate two secret files for two testing datbases under `config/minikube/.secrets`
 * deploy two postrgresql instances (one for publishing the other for subscribing)
+* inject example data to the publishing database under `published_data` schema
 
 ## Project Distribution
 
