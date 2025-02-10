@@ -1,0 +1,65 @@
+- op: replace
+  path: /metadata/name
+  value: publishing-database
+- op: add
+  path: /metadata/labels/designation
+  value: publishing
+- op: add
+  path: /spec/selector/matchLabels/designation
+  value: publishing
+- op: add
+  path: /spec/template/metadata/labels/designation
+  value: publishing
+- op: add
+  path: /metadata/labels/designation
+  value: publishing
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: POSTGRESQL_USER
+    valueFrom:
+      secretKeyRef:
+        key: db.user
+        name: publishing-database
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: POSTGRESQL_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        key: db.password
+        name: publishing-database
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: PGPASSWORD
+    valueFrom:
+      secretKeyRef:
+        key: db.admin_password
+        name: publishing-database
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: POSTGRESQL_MASTER_USER
+    valueFrom:
+      secretKeyRef:
+        key: db.admin_user
+        name: publishing-database
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: POSTGRESQL_MASTER_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        key: db.admin_password
+        name: publishing-database
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: POSTGRESQL_DATABASE
+    valueFrom:
+      secretKeyRef:
+        key: db.name
+        name: publishing-database
+
+

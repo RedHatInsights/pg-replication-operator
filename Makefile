@@ -191,6 +191,9 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+minikube-setup: kustomize minikube-secrets
+	$(KUSTOMIZE) build config/minikube | $(KUBECTL) apply -f -
+
 minikube-secrets: config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt
 
 config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt:

@@ -1,6 +1,10 @@
 # Adds namespace to all resources.
 namespace: default
 
+resources:
+  - ./publishing-database
+  - ./subscribing-database
+
 generatorOptions:
   # needed for secrets to be accessible by operator created cronjobs
   disableNameSuffixHash: true

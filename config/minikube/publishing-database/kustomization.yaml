@@ -1,0 +1,12 @@
+resources:
+  - ../postgresql-db-base
+
+patches:
+  - path: patch-deployment.yaml
+    target:
+      kind: Deployment
+      name: postgresql-db
+  - path: patch-service.yaml
+    target:
+      kind: Service
+      name: database
