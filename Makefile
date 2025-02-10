@@ -191,6 +191,18 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+minikube-secrets: config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt
+
+config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt:
+	@{ \
+		set -e; \
+		FILE=$(shell basename "$@"); \
+		NAME=$${FILE%.*}; \
+		PASS="$(call generate-rand, "30")"; \
+		ADMINPASS="$(call generate-rand, "30")"; \
+		echo -e "db.host=$${NAME}\ndb.port=5432\ndb.user=$${NAME}\ndb.password=$${PASS}\ndb.name=$${NAME}\ndb.admin_user=postgres\ndb.admin_password=$${ADMINPASS}\n" > "$@" ; \
+	}
+
 ##@ Dependencies
 
 ## Location to install dependencies to
@@ -245,6 +257,10 @@ GOBIN=$(LOCALBIN) go install $${package} ;\
 mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
+endef
+
+define generate-rand
+$(shell cat /dev/urandom | tr -dc '[:alnum:]' | fold -w "$(1)" | head -n 1)
 endef
 
 .PHONY: operator-sdk

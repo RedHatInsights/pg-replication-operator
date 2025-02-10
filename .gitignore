@@ -30,6 +30,7 @@ go.work.sum
 !vendor/**/zz_generated.*
 bundle/manifests/*
 kubeconfig
+config/minikube/.secrets
 
 # editor and IDE paraphernalia
 .idea
