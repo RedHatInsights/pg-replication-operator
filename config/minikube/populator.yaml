@@ -1,0 +1,90 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: populator
+    pod: test-app
+  name: populator
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: populator
+        pod: test-app
+    spec:
+      containers:
+      - args:
+        - -c
+        - /tmp/app.sh
+        command:
+        - /bin/bash
+        env:
+        - name: PGHOST
+          valueFrom:
+            secretKeyRef:
+              key: db.host
+              name: publishing-database
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              key: db.name
+              name: publishing-database
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: db.password
+              name: publishing-database
+        - name: PGPORT
+          valueFrom:
+            secretKeyRef:
+              key: db.port
+              name: publishing-database
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              key: db.user
+              name: publishing-database
+        image: docker.io/postgres:16
+        name: populator
+        resources:
+          limits:
+            cpu: 50m
+            memory: 100Mi
+          requests:
+            cpu: 20m
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /tmp
+          name: app-script-volume
+      restartPolicy: OnFailure
+      volumes:
+      - configMap:
+          defaultMode: 493
+          name: populator-script
+        name: app-script-volume
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: populator-script
+data:
+  app.sh: |
+    set -e
+    psql <<EOF
+      CREATE SCHEMA IF NOT EXISTS published_data;
+      CREATE TABLE IF NOT EXISTS published_data.people
+        (id UUID PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE, birthyear INT);
+      INSERT INTO published_data.people VALUES
+        (gen_random_uuid(), 'My Name', 'My Email', 9999),
+        (gen_random_uuid(), 'Your Name', 'Your Email', 1111)
+        ON CONFLICT DO NOTHING;
+      CREATE TABLE IF NOT EXISTS published_data.cities
+        (id UUID PRIMARY KEY, name VARCHAR(255) UNIQUE, zip VARCHAR(255), country VARCHAR(255));
+      INSERT INTO published_data.cities VALUES
+        (gen_random_uuid(), 'Ney York', '900 22', 'USA'),
+        (gen_random_uuid(), 'Rio', '111 88', 'Brazil'),
+        (gen_random_uuid(), 'Tokyo', '91378', 'Japan')
+        ON CONFLICT DO NOTHING;
+    EOF

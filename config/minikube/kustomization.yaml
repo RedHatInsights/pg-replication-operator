@@ -4,6 +4,7 @@ namespace: default
 resources:
   - ./publishing-database
   - ./subscribing-database
+  - populator.yaml
 
 generatorOptions:
   # needed for secrets to be accessible by operator created cronjobs
