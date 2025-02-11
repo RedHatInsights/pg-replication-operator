@@ -81,7 +81,7 @@ make undeploy
 
 To set up the development environment using Minikube, first create and start the Minikube cluster:
 ```
-minikube start
+minikube start --addons=registry
 ```
 
 Then run:
@@ -93,6 +93,14 @@ This would:
 * generate two secret files for two testing datbases under `config/minikube/.secrets`
 * deploy two postrgresql instances (one for publishing the other for subscribing)
 * inject example data to the publishing database under `published_data` schema
+
+To build and deploy it to minikube use:
+```
+make deploy-minikube
+```
+
+Please note, that the image would be labeled in a format of `SHORT_GIT_HASH-YYYMMDDHHmm`.
+To control the label, set the `VERSION` variable.
 
 ## Project Distribution
 

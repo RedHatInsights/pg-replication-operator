@@ -1,10 +1,3 @@
-# VERSION defines the project version for the bundle.
-# Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
-
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -49,8 +42,21 @@ endif
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.39.1
+
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+ifeq ($(findstring -minikube,${MAKECMDGOALS}), -minikube)
+VERSION ?= $(shell git rev-parse --short HEAD)-$(shell date +"%Y%m%d%H%M")
+IMG ?= 127.0.0.1:5000/pg-replication-operator:$(VERSION)
+else
+# VERSION defines the project version for the bundle.
+# Update this value when you upgrade the version of your project.
+# To re-generate a bundle for another specific version without changing the standard setup, you can:
+# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
+# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
+VERSION ?= 0.0.1
+IMG ?= controller:$(VERSION)
+endif
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -205,6 +211,12 @@ config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscr
 		ADMINPASS="$(call generate-rand, "30")"; \
 		echo -e "db.host=$${NAME}\ndb.port=5432\ndb.user=$${NAME}\ndb.password=$${PASS}\ndb.name=$${NAME}\ndb.admin_user=postgres\ndb.admin_password=$${ADMINPASS}\n" > "$@" ; \
 	}
+
+# Push the docker image
+docker-push-minikube:
+	$(CONTAINER_TOOL) push ${IMG} $(shell minikube ip):5000/pg-replication-operator:$(VERSION) --tls-verify=false
+
+deploy-minikube: minikube-setup docker-build docker-push-minikube deploy
 
 ##@ Dependencies
 
