@@ -202,7 +202,7 @@ minikube-setup: kustomize minikube-secrets
 
 minikube-secrets: config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt
 
-config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt:
+config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscribing-database.txt: config/minikube/.secrets
 	@{ \
 		set -e; \
 		FILE=$(shell basename "$@"); \
@@ -211,6 +211,9 @@ config/minikube/.secrets/publishing-database.txt config/minikube/.secrets/subscr
 		ADMINPASS="$(call generate-rand, "30")"; \
 		echo -e "db.host=$${NAME}\ndb.port=5432\ndb.user=$${NAME}\ndb.password=$${PASS}\ndb.name=$${NAME}\ndb.admin_user=postgres\ndb.admin_password=$${ADMINPASS}\n" > "$@" ; \
 	}
+
+config/minikube/.secrets:
+	mkdir -p "$@"
 
 # Push the docker image
 docker-push-minikube:
