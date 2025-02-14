@@ -43,9 +43,11 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.39.1
 
+MINUTE_TIMESTAMP := $(shell date +"%Y%m%d%H%M")
+
 # Image URL to use all building/pushing image targets
 ifeq ($(findstring -minikube,${MAKECMDGOALS}), -minikube)
-VERSION ?= $(shell git rev-parse --short HEAD)-$(shell date +"%Y%m%d%H%M")
+VERSION ?= $(shell git rev-parse --short HEAD)-$(MINUTE_TIMESTAMP)
 IMG ?= 127.0.0.1:5000/pg-replication-operator:$(VERSION)
 else
 # VERSION defines the project version for the bundle.
