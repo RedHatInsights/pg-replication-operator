@@ -2,11 +2,16 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/go-viper/mapstructure/v2"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
 )
@@ -20,6 +25,7 @@ type LogicalReplicationReconciler struct {
 // +kubebuilder:rbac:groups=replication.console.redhat.com,resources=logicalreplications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=replication.console.redhat.com,resources=logicalreplications/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=replication.console.redhat.com,resources=logicalreplications/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -36,6 +42,33 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// TODO(user): your logic here
 
 	return ctrl.Result{}, nil
+}
+
+// Get secret with database credentials by name
+func (r *LogicalReplicationReconciler) getCredentialsFromSecret(ctx context.Context, req ctrl.Request, secretName string) (DatabaseCredentials, error) {
+	var db DatabaseCredentials
+	var secret corev1.Secret
+	var err error
+
+	nn := types.NamespacedName{
+		Name:      secretName,
+		Namespace: req.Namespace,
+	}
+	if err = r.Client.Get(ctx, nn, &secret); err != nil {
+		return db, err
+	}
+
+	var data interface{}
+	if len(secret.Data) > 0 {
+		data = secret.Data
+	} else if len(secret.StringData) > 0 {
+		data = secret.StringData
+	} else {
+		return db, fmt.Errorf("no secret data")
+	}
+
+	err = mapstructure.WeakDecode(data, &db)
+	return db, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
