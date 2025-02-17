@@ -53,6 +53,14 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	log.Info("publishing database", "databaseHost", publishingDb.Host, "databasePort", publishingDb.Port)
 
+	subscribingDb, err := r.getCredentialsFromSecret(ctx, req, lr.Spec.Subscription.SecretName)
+	if err != nil {
+		log.Error(err, "getting subscribing credentials")
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	log.Info("subscribing database", "databaseHost", subscribingDb.Host, "databasePort", subscribingDb.Port)
+
 	return ctrl.Result{}, nil
 }
 
