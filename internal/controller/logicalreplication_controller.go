@@ -37,9 +37,21 @@ type LogicalReplicationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Get the LogicalReplication object from the API
+	var lr replicationv1alpha1.LogicalReplication
+	if err := r.Client.Get(ctx, req.NamespacedName, &lr); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	publishingDb, err := r.getCredentialsFromSecret(ctx, req, lr.Spec.Publication.SecretName)
+	if err != nil {
+		log.Error(err, "getting publication credentials")
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	log.Info("publishing database", "databaseHost", publishingDb.Host, "databasePort", publishingDb.Port)
 
 	return ctrl.Result{}, nil
 }

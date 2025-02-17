@@ -6,4 +6,8 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: logicalreplication-sample
 spec:
-  # TODO(user): Add fields here
+  publication:
+    name: publication_v1
+    secretName: publishing-database
+  subscription:
+    secretName: subscribing-database
