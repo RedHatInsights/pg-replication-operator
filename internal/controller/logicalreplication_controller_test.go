@@ -9,14 +9,45 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
 )
 
+func generateDbSecret(ctx context.Context, nn types.NamespacedName) *corev1.Secret {
+	secret := &corev1.Secret{}
+
+	err := k8sClient.Get(ctx, nn, secret)
+	if err != nil && errors.IsNotFound(err) {
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      nn.Name,
+				Namespace: nn.Namespace,
+			},
+			Data: map[string][]byte{
+				"db.host":           []byte("db-hostname"),
+				"db.port":           []byte("1234"),
+				"db.user":           []byte("db-user"),
+				"db.password":       []byte("db-password"),
+				"db.admin_password": []byte("db-admin-password"),
+				"db.admin_user":     []byte("db-admin-user"),
+				"db.name":           []byte("db-name"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+		return secret
+	}
+
+	Expect(err).ShouldNot(HaveOccurred())
+	return secret
+}
+
 var _ = Describe("LogicalReplication Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
+		const publishingSecretName = "publishing-database"
+		const subscribingSecretname = "subscribing-database"
 
 		ctx := context.Background()
 
@@ -27,6 +58,20 @@ var _ = Describe("LogicalReplication Controller", func() {
 		logicalreplication := &replicationv1alpha1.LogicalReplication{}
 
 		BeforeEach(func() {
+			By("creating the publication database secret")
+			publSecretNN := types.NamespacedName{
+				Name:      publishingSecretName,
+				Namespace: typeNamespacedName.Namespace,
+			}
+			generateDbSecret(ctx, publSecretNN)
+
+			By("creating the subscribing database secret")
+			subSecretNN := types.NamespacedName{
+				Name:      subscribingSecretname,
+				Namespace: typeNamespacedName.Namespace,
+			}
+			generateDbSecret(ctx, subSecretNN)
+
 			By("creating the custom resource for the Kind LogicalReplication")
 			err := k8sClient.Get(ctx, typeNamespacedName, logicalreplication)
 			if err != nil && errors.IsNotFound(err) {
@@ -35,7 +80,15 @@ var _ = Describe("LogicalReplication Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: replicationv1alpha1.LogicalReplicationSpec{
+						Publication: replicationv1alpha1.PublicationSpec{
+							Name:       "publication_v1",
+							SecretName: publishingSecretName,
+						},
+						Subscription: replicationv1alpha1.SubscriptionSpec{
+							SecretName: subscribingSecretname,
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
