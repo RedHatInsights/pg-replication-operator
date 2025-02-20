@@ -63,10 +63,16 @@ func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.
 		return
 	}
 
+	var reason string
+	replerr, ok := err.(ReplicationError)
+	if ok {
+		reason = string(replerr.Reason)
+	}
+
 	obj.Status.ReplicationStatus = replicationv1alpha1.ReplicationStatus{
 		Phase:   replicationv1alpha1.ReplicationPhaseFailed,
 		Message: err.Error(),
-		// Reason:  reason,
+		Reason:  reason,
 	}
 }
 
@@ -99,7 +105,7 @@ func (i *LogicalReplicationIteration) readCredentails() error {
 	publishingDb, err := i.getCredentialsFromSecret(i.obj.Spec.Publication.SecretName)
 	if err != nil {
 		i.log.Error(err, "getting publication credentials")
-		return err
+		return NewReplicationError(SecretError, err)
 	}
 	i.pubCreds = publishingDb
 
@@ -108,7 +114,7 @@ func (i *LogicalReplicationIteration) readCredentails() error {
 	subscribingDb, err := i.getCredentialsFromSecret(i.obj.Spec.Subscription.SecretName)
 	if err != nil {
 		i.log.Error(err, "getting subscribing credentials")
-		return err
+		return NewReplicationError(SecretError, err)
 	}
 	i.subCreds = subscribingDb
 
