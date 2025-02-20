@@ -41,19 +41,33 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var _ = log.FromContext(ctx)
 
 	// Get the LogicalReplication object from the API
-	var lr replicationv1alpha1.LogicalReplication
-	if err := r.Client.Get(ctx, req.NamespacedName, &lr); err != nil {
+	lr := &replicationv1alpha1.LogicalReplication{}
+	if err := r.Client.Get(ctx, req.NamespacedName, lr); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	iteration := NewLogicalReplicationIteration(r.Client, ctx, req)
 
-	err := iteration.Iterate(&lr)
+	err := iteration.Iterate(lr)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, nil
+		r.setFailedStatus(lr, err)
+		err := r.Status().Update(ctx, lr)
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.LogicalReplication, err error) {
+	if err == nil {
+		return
+	}
+
+	obj.Status.ReplicationStatus = replicationv1alpha1.ReplicationStatus{
+		Phase:   replicationv1alpha1.ReplicationPhaseFailed,
+		Message: err.Error(),
+		// Reason:  reason,
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

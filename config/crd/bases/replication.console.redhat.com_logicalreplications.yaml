@@ -74,6 +74,24 @@ spec:
             type: object
           status:
             description: LogicalReplicationStatus defines the observed state of LogicalReplication
+            properties:
+              replicationStatus:
+                description: Status of the replication
+                properties:
+                  message:
+                    type: string
+                  phase:
+                    enum:
+                    - Pending
+                    - Replicating
+                    - Failed
+                    - Unknown
+                    type: string
+                  reason:
+                    type: string
+                type: object
+            required:
+            - replicationStatus
             type: object
         type: object
     served: true
