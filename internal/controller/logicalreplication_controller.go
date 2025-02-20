@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	"github.com/go-viper/mapstructure/v2"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
@@ -37,7 +38,7 @@ type LogicalReplicationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	var _ = log.FromContext(ctx)
 
 	// Get the LogicalReplication object from the API
 	var lr replicationv1alpha1.LogicalReplication
@@ -45,36 +46,73 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	publishingDb, err := r.getCredentialsFromSecret(ctx, req, lr.Spec.Publication.SecretName)
+	iteration := NewLogicalReplicationIteration(r.Client, ctx, req)
+
+	err := iteration.Iterate(&lr)
 	if err != nil {
-		log.Error(err, "getting publication credentials")
 		return ctrl.Result{Requeue: true}, nil
 	}
-
-	log.Info("publishing database", "databaseHost", publishingDb.Host, "databasePort", publishingDb.Port)
-
-	subscribingDb, err := r.getCredentialsFromSecret(ctx, req, lr.Spec.Subscription.SecretName)
-	if err != nil {
-		log.Error(err, "getting subscribing credentials")
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	log.Info("subscribing database", "databaseHost", subscribingDb.Host, "databasePort", subscribingDb.Port)
 
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *LogicalReplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&replicationv1alpha1.LogicalReplication{}).
+		Complete(r)
+}
+
+type LogicalReplicationIteration struct {
+	Client   client.Client
+	ctx      context.Context
+	Request  ctrl.Request
+	log      logr.Logger
+	obj      *replicationv1alpha1.LogicalReplication
+	pubCreds DatabaseCredentials
+	subCreds DatabaseCredentials
+}
+
+func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalReplication) error {
+	i.log = log.FromContext(i.ctx)
+	i.obj = lr
+
+	err := i.readCredentails()
+	return err
+}
+
+func (i *LogicalReplicationIteration) readCredentails() error {
+	publishingDb, err := i.getCredentialsFromSecret(i.obj.Spec.Publication.SecretName)
+	if err != nil {
+		i.log.Error(err, "getting publication credentials")
+		return err
+	}
+	i.pubCreds = publishingDb
+
+	i.log.Info("publishing database", "databaseHost", publishingDb.Host, "databasePort", publishingDb.Port)
+
+	subscribingDb, err := i.getCredentialsFromSecret(i.obj.Spec.Subscription.SecretName)
+	if err != nil {
+		i.log.Error(err, "getting subscribing credentials")
+		return err
+	}
+	i.subCreds = subscribingDb
+
+	i.log.Info("subscribing database", "databaseHost", subscribingDb.Host, "databasePort", subscribingDb.Port)
+	return nil
+}
+
 // Get secret with database credentials by name
-func (r *LogicalReplicationReconciler) getCredentialsFromSecret(ctx context.Context, req ctrl.Request, secretName string) (DatabaseCredentials, error) {
+func (i *LogicalReplicationIteration) getCredentialsFromSecret(secretName string) (DatabaseCredentials, error) {
 	var db DatabaseCredentials
 	var secret corev1.Secret
 	var err error
 
 	nn := types.NamespacedName{
 		Name:      secretName,
-		Namespace: req.Namespace,
+		Namespace: i.Request.Namespace,
 	}
-	if err = r.Client.Get(ctx, nn, &secret); err != nil {
+	if err = i.Client.Get(i.ctx, nn, &secret); err != nil {
 		return db, err
 	}
 
@@ -91,9 +129,10 @@ func (r *LogicalReplicationReconciler) getCredentialsFromSecret(ctx context.Cont
 	return db, err
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *LogicalReplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&replicationv1alpha1.LogicalReplication{}).
-		Complete(r)
+func NewLogicalReplicationIteration(client client.Client, ctx context.Context, req ctrl.Request) *LogicalReplicationIteration {
+	return &LogicalReplicationIteration{
+		Client:  client,
+		ctx:     ctx,
+		Request: req,
+	}
 }
