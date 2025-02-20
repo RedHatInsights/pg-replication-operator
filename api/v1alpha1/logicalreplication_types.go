@@ -37,9 +37,20 @@ type SubscriptionSpec struct {
 
 // LogicalReplicationStatus defines the observed state of LogicalReplication
 type LogicalReplicationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	ReplicationStatus ReplicationStatus `json:"replicationStatus"`
 }
+
+// Status of the replication
+type ReplicationStatus struct {
+	Phase   ReplicationPhase `json:"phase,omitempty"`
+	Reason  string           `json:"reason,omitempty"`
+	Message string           `json:"message,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=Pending;Replicating;Failed;Unknown
+type ReplicationPhase string
+
+var ReplicationPhaseFailed = ReplicationPhase("Failed")
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
