@@ -31,6 +31,7 @@ go.work.sum
 bundle/manifests/*
 kubeconfig
 config/minikube/.secrets
+config/manager/kustomization.yaml
 
 # editor and IDE paraphernalia
 .idea
