@@ -1,4 +1,4 @@
-package controller
+package replication
 
 import (
 	"github.com/go-viper/mapstructure/v2"

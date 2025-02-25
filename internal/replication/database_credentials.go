@@ -1,4 +1,4 @@
-package controller
+package replication
 
 type DatabaseCredentials struct {
 	// Hostname
