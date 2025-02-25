@@ -3,6 +3,7 @@ module github.com/RedHatInsights/pg-replication-operator
 go 1.22.0
 
 require (
+	github.com/lib/pq v1.10.9
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	k8s.io/apimachinery v0.31.0

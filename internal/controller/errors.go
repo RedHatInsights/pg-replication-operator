@@ -3,6 +3,7 @@ package controller
 type ReplicationErrorReason string
 
 var SecretError ReplicationErrorReason = "SecretError"
+var ConnectError ReplicationErrorReason = "ConnectError"
 
 type ReplicationError struct {
 	Reason ReplicationErrorReason

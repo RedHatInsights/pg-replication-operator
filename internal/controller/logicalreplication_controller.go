@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
+	"github.com/RedHatInsights/pg-replication-operator/internal/replication"
 )
 
 // LogicalReplicationReconciler reconciles a LogicalReplication object
@@ -89,8 +91,10 @@ type LogicalReplicationIteration struct {
 	Request  ctrl.Request
 	log      logr.Logger
 	obj      *replicationv1alpha1.LogicalReplication
-	pubCreds DatabaseCredentials
-	subCreds DatabaseCredentials
+	pubCreds replication.DatabaseCredentials
+	pubDB    *sql.DB
+	subCreds replication.DatabaseCredentials
+	subDB    *sql.DB
 }
 
 func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalReplication) error {
@@ -98,6 +102,10 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 	i.obj = lr
 
 	err := i.readCredentails()
+	if err != nil {
+		return err
+	}
+	err = i.connectDBs()
 	return err
 }
 
@@ -122,9 +130,30 @@ func (i *LogicalReplicationIteration) readCredentails() error {
 	return nil
 }
 
+func (i *LogicalReplicationIteration) connectDBs() error {
+	publishingDb, err := replication.DBConnect(i.pubCreds)
+	if err != nil {
+		i.log.Error(err, "connecting to publication db")
+		return NewReplicationError(ConnectError, err)
+	}
+	i.pubDB = publishingDb
+
+	i.log.Info("connected to publishing database")
+
+	subscribingDb, err := replication.DBConnect(i.subCreds)
+	if err != nil {
+		i.log.Error(err, "connecting to subscribing db")
+		return NewReplicationError(ConnectError, err)
+	}
+	i.subDB = subscribingDb
+
+	i.log.Info("connected to subscribing database")
+	return nil
+}
+
 // Get secret with database credentials by name
-func (i *LogicalReplicationIteration) getCredentialsFromSecret(secretName string) (DatabaseCredentials, error) {
-	var db DatabaseCredentials
+func (i *LogicalReplicationIteration) getCredentialsFromSecret(secretName string) (replication.DatabaseCredentials, error) {
+	var db replication.DatabaseCredentials
 	var secret corev1.Secret
 	var err error
 
