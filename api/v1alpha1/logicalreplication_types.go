@@ -28,7 +28,7 @@ type PublicationSpec struct {
 	SecretName string `json:"secretName"`
 }
 
-// SubscriptionSpec defines the datbase where the replication would be set up.
+// SubscriptionSpec defines the database where the replication would be set up.
 type SubscriptionSpec struct {
 	// The secret name of to connect to the dababase where the replication
 	// would be set up.
