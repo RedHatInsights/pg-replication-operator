@@ -3,12 +3,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	testcontainers "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -19,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
+	"github.com/RedHatInsights/pg-replication-operator/internal/replication"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -36,6 +42,43 @@ func TestControllers(t *testing.T) {
 
 	RunSpecs(t, "Controller Suite")
 }
+
+const postgresImage = "docker.io/library/postgres:16-alpine"
+
+// func setupPgContainer(ctx context.Context) string {
+func setupPgContainer(ctx context.Context) (*postgres.PostgresContainer, replication.DatabaseCredentials) {
+	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
+
+	pgContainer, err := postgres.Run(ctx, postgresImage,
+		postgres.WithInitScripts(filepath.Join("..", "..", "test", "data", "create_databases.sql")),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
+	)
+	Expect(err).Should(BeNil())
+
+	DeferCleanup(cancel)
+
+	host, err := pgContainer.Host(ctx)
+	Expect(err).ToNot(HaveOccurred())
+	port, err := pgContainer.MappedPort(ctx, "5432")
+	Expect(err).ToNot(HaveOccurred())
+	pgCredentials := replication.DatabaseCredentials{
+		Host:          host,
+		Port:          port.Port(),
+		AdminUser:     "postgres",
+		AdminPassword: "postgres",
+	}
+
+	return pgContainer, pgCredentials
+}
+
+func shutdownPgContainer(ctx context.Context, container *postgres.PostgresContainer) {
+	Expect(container.Terminate(ctx)).Should(BeNil())
+}
+
+var pgContainer *postgres.PostgresContainer
+var pgCredentials replication.DatabaseCredentials
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
@@ -88,6 +131,8 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
+	By("starting postgresql container")
+	pgContainer, pgCredentials = setupPgContainer(ctx)
 })
 
 var _ = AfterSuite(func() {
@@ -95,4 +140,6 @@ var _ = AfterSuite(func() {
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	By("tearing down postgres container")
+	shutdownPgContainer(context.Background(), pgContainer)
 })
