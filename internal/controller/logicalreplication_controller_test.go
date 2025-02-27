@@ -15,7 +15,7 @@ import (
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
 )
 
-func generateDbSecret(ctx context.Context, nn types.NamespacedName) *corev1.Secret {
+func generateDbSecret(ctx context.Context, nn types.NamespacedName, database string) *corev1.Secret {
 	secret := &corev1.Secret{}
 
 	err := k8sClient.Get(ctx, nn, secret)
@@ -26,13 +26,13 @@ func generateDbSecret(ctx context.Context, nn types.NamespacedName) *corev1.Secr
 				Namespace: nn.Namespace,
 			},
 			Data: map[string][]byte{
-				"db.host":           []byte("db-hostname"),
-				"db.port":           []byte("1234"),
-				"db.user":           []byte("db-user"),
-				"db.password":       []byte("db-password"),
-				"db.admin_password": []byte("db-admin-password"),
-				"db.admin_user":     []byte("db-admin-user"),
-				"db.name":           []byte("db-name"),
+				"db.host":           []byte(pgCredentials.Host),
+				"db.port":           []byte(pgCredentials.Port),
+				"db.user":           []byte(database + "_user"),
+				"db.password":       []byte(database + "_password"),
+				"db.admin_password": []byte(pgCredentials.AdminPassword),
+				"db.admin_user":     []byte(pgCredentials.AdminUser),
+				"db.name":           []byte(database + "_db"),
 			},
 		}
 		Expect(k8sClient.Create(ctx, secret)).To(Succeed())
@@ -63,14 +63,14 @@ var _ = Describe("LogicalReplication Controller", func() {
 				Name:      publishingSecretName,
 				Namespace: typeNamespacedName.Namespace,
 			}
-			generateDbSecret(ctx, publSecretNN)
+			generateDbSecret(ctx, publSecretNN, "publisher")
 
 			By("creating the subscribing database secret")
 			subSecretNN := types.NamespacedName{
 				Name:      subscribingSecretname,
 				Namespace: typeNamespacedName.Namespace,
 			}
-			generateDbSecret(ctx, subSecretNN)
+			generateDbSecret(ctx, subSecretNN, "subscriber")
 
 			By("creating the custom resource for the Kind LogicalReplication")
 			err := k8sClient.Get(ctx, typeNamespacedName, logicalreplication)
