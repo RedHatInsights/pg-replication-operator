@@ -106,6 +106,10 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 		return err
 	}
 	err = i.connectDBs()
+	if err != nil {
+		return err
+	}
+	err = i.checkPublication()
 	return err
 }
 
@@ -148,6 +152,18 @@ func (i *LogicalReplicationIteration) connectDBs() error {
 	i.subDB = subscribingDb
 
 	i.log.Info("connected to subscribing database")
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkPublication() error {
+	// i.pubDB = publishingDb
+	err := replication.CheckPublication(i.pubDB, i.obj.Spec.Publication.Name)
+	if err != nil {
+		i.log.Error(err, "checking publication")
+		return NewReplicationError(PublicationError, err)
+	}
+	i.log.Info("checked publications")
+
 	return nil
 }
 
