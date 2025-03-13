@@ -50,6 +50,11 @@ func setupPgContainer(ctx context.Context) (*postgres.PostgresContainer, replica
 	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 	pgContainer, err := postgres.Run(ctx, postgresImage,
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Cmd: []string{"-c", "wal_level=logical"},
+			},
+		}),
 		postgres.WithInitScripts(filepath.Join("..", "..", "test", "data", "create_databases.sql")),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
