@@ -49,6 +49,11 @@ func setupPgContainer(ctx context.Context) (*postgres.PostgresContainer, replica
 
 	pgContainer, err := postgres.Run(ctx,
 		"docker.io/library/postgres:16-alpine",
+		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Cmd: []string{"-c", "wal_level=logical"},
+			},
+		}),
 		postgres.WithInitScripts(filepath.Join("..", "..", "test", "data", "create_databases.sql")),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
