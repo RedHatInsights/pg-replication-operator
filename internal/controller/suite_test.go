@@ -52,7 +52,7 @@ func setupPgContainer(ctx context.Context) (*postgres.PostgresContainer, replica
 	pgContainer, err := postgres.Run(ctx, postgresImage,
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
-				Cmd: []string{"-c", "wal_level=logical"},
+				Cmd: []string{"-c", "wal_level=logical", "-c", "listen_addresses=*"},
 			},
 		}),
 		postgres.WithInitScripts(filepath.Join("..", "..", "test", "data", "create_databases.sql")),
@@ -68,12 +68,24 @@ func setupPgContainer(ctx context.Context) (*postgres.PostgresContainer, replica
 	Expect(err).ToNot(HaveOccurred())
 	port, err := pgContainer.MappedPort(ctx, "5432")
 	Expect(err).ToNot(HaveOccurred())
+	portStr := port.Port()
 	pgCredentials := replication.DatabaseCredentials{
 		Host:          host,
-		Port:          port.Port(),
+		Port:          portStr,
 		AdminUser:     "postgres",
 		AdminPassword: "postgres",
 	}
+
+	// we need the same port for postgres both externaly and internaly
+	_, _, err = pgContainer.Exec(ctx, []string{"sh", "-c", "nc -lkp" + portStr + " -e nc localhost 5432 &"})
+	Expect(err).Should(BeNil())
+
+	// finish subscription
+	_, _, err = pgContainer.Exec(ctx, []string{"psql", "-U", "postgres", "-d", "subscriber_db",
+		"-c", "ALTER SUBSCRIPTION publication_v1 CONNECTION 'host=localhost port=" + portStr + " user=publisher_user password=publisher_password dbname=publisher_db sslmode=disable';",
+		"-c", "ALTER SUBSCRIPTION publication_v1 ENABLE;",
+		"-c", "ALTER SUBSCRIPTION publication_v1 REFRESH PUBLICATION;"})
+	Expect(err).Should(BeNil())
 
 	return pgContainer, pgCredentials
 }
