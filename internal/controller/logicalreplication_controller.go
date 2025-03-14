@@ -113,6 +113,11 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 		return err
 	}
 	err = i.checkPublication()
+	if err != nil {
+		return err
+	}
+
+	err = i.checkSubscription()
 	return err
 }
 
@@ -159,13 +164,23 @@ func (i *LogicalReplicationIteration) connectDBs() error {
 }
 
 func (i *LogicalReplicationIteration) checkPublication() error {
-	// i.pubDB = publishingDb
 	err := replication.CheckPublication(i.pubDB, i.obj.Spec.Publication.Name)
 	if err != nil {
 		i.log.Error(err, "checking publication")
 		return NewReplicationError(PublicationError, err)
 	}
 	i.log.Info("checked publications")
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscription() error {
+	err := replication.CheckSubscription(i.subDB, i.obj.Spec.Publication.Name, i.pubCreds)
+	if err != nil {
+		i.log.Error(err, "checking subscription")
+		return NewReplicationError(SubscriptionError, err)
+	}
+	i.log.Info("checked subscription")
 
 	return nil
 }
