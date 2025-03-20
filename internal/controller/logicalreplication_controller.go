@@ -117,6 +117,26 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 		return err
 	}
 
+	tables, err := i.publicationTables()
+	if err != nil {
+		return err
+	}
+	for _, table := range tables {
+		i.log.Info("checking", table.Schema, table.Name)
+		err = i.checkSubscriptionSchema(table)
+		if err != nil {
+			return err
+		}
+		err = i.checkSubscriptionTable(table)
+		if err != nil {
+			return err
+		}
+		err = i.checkSubscriptionView(table)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = i.checkSubscription()
 	return err
 }
@@ -171,6 +191,49 @@ func (i *LogicalReplicationIteration) checkPublication() error {
 	}
 	i.log.Info("checked publications")
 
+	return nil
+}
+
+func (i *LogicalReplicationIteration) publicationTables() ([]replication.PgTable, error) {
+	tables, err := replication.PublicationTables(i.pubDB, i.obj.Spec.Publication.Name)
+	if err != nil {
+		i.log.Error(err, "checking publication tables")
+		return nil, NewReplicationError(PublicationTablesError, err)
+	}
+	i.log.Info("checked publication tables")
+
+	return tables, nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionSchema(table replication.PgTable) error {
+	err := replication.CheckSubscriptionSchema(i.subDB, table.Schema)
+	if err != nil {
+		i.log.Error(err, "checking subscription schema", "schema", table.Schema)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("checked subscription schema", "schema", table.Schema)
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionTable(table replication.PgTable) error {
+	err := replication.PublicationTableDetail(i.pubDB, &table)
+	if err != nil {
+		i.log.Error(err, "reading publication table details", table.Schema, table.Name)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("read publication table details", table.Schema, table.Name)
+
+	err = replication.CheckSubscriptionTableDetail(i.subDB, i.obj.Spec.Publication.Name, table)
+	if err != nil {
+		i.log.Error(err, "checking publication table details", table.Schema, table.Name)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("checking publication table details", table.Schema, table.Name)
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionView(replication.PgTable) error {
 	return nil
 }
 
