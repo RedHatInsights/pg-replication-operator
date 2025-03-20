@@ -120,6 +120,25 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 		return err
 	}
 
+	tables, err := i.publicationTables()
+	if err != nil {
+		return err
+	}
+	for _, table := range tables {
+
+		if err = i.checkSubscriptionSchema(table); err != nil {
+			return err
+		}
+
+		if err = i.checkSubscriptionTable(table); err != nil {
+			return err
+		}
+
+		if err = i.checkSubscriptionView(table); err != nil {
+			return err
+		}
+	}
+
 	if err := i.checkSubscription(); err != nil {
 		return err
 	}
@@ -201,6 +220,73 @@ func (i *LogicalReplicationIteration) disableSubscriptionIfPublicationChanged() 
 	}
 	i.log.Info("disabled", "subscription", oldName)
 
+	return nil
+}
+
+func (i *LogicalReplicationIteration) publicationTables() ([]replication.PgTable, error) {
+	tables, err := replication.PublicationTables(i.pubDB, i.obj.Spec.Publication.Name)
+	if err != nil {
+		i.log.Error(err, "checking publication tables")
+		return nil, NewReplicationError(PublicationTablesError, err)
+	}
+	i.log.Info("checked publication tables")
+
+	return tables, nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionSchema(table replication.PgTable) error {
+	err := replication.CheckSubscriptionSchema(i.subDB, table.Schema)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = replication.CreateSubscriptionSchema(i.subDB, table.Schema)
+			if err != nil {
+				i.log.Error(err, "creating subscription", "schema", table.Name)
+				return NewReplicationError(SubscriptionError, err)
+			}
+			i.log.Info("created subscription", "schema", table.Name)
+		} else {
+			i.log.Error(err, "checking subscription", "schema", table.Schema)
+			return NewReplicationError(SubscriptionSchemaError, err)
+		}
+	}
+
+	i.log.Info("checked subscription", "schema", table.Schema)
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionTable(table replication.PgTable) error {
+	err := replication.PublicationTableDetail(i.pubDB, &table)
+	if err != nil {
+		i.log.Error(err, "reading publication details", "schema", table.Schema, "table", table.Name)
+		return NewReplicationError(PublicationTablesError, err)
+	}
+	i.log.Info("read publication details", "schema", table.Schema, "table", table.Name)
+
+	err = replication.CheckSubscriptionTableDetail(i.subDB, table)
+	if err != nil {
+		if err == replication.ErrWrongAttributes {
+			err = replication.RenameSubscriptionTable(i.subDB, i.obj.Spec.Publication.Name, table)
+			if err != nil {
+				i.log.Error(err, "renaming subscription", "schema", table.Schema, "table", table.Name)
+				return NewReplicationError(SubscriptionTablesError, err)
+			}
+			err = replication.CreateSubscriptionTable(i.subDB, table)
+			if err != nil {
+				i.log.Error(err, "creating subscription", "schema", table.Schema, "table", table.Name)
+				return NewReplicationError(SubscriptionTablesError, err)
+			}
+
+		} else {
+			i.log.Error(err, "reading subscription details", "schema", table.Schema, "table", table.Name)
+			return NewReplicationError(SubscriptionTablesError, err)
+		}
+	}
+
+	i.log.Info("checking publication details", "schema", table.Schema, "table", table.Name)
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionView(replication.PgTable) error {
 	return nil
 }
 
