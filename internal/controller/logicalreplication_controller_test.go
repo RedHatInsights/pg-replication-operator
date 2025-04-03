@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +28,18 @@ func generateDbCredentials(database string) replication.DatabaseCredentials {
 		AdminUser:     pgCredentials.AdminUser,
 		DatabaseName:  database + "_db",
 	}
+}
+
+func runReconcile(ctx context.Context, namespace types.NamespacedName) (controllerruntime.Result, error) {
+	controllerReconciler := &LogicalReplicationReconciler{
+		Client: k8sClient,
+		Scheme: k8sClient.Scheme(),
+	}
+
+	result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: namespace,
+	})
+	return result, err
 }
 
 func generateDbSecret(ctx context.Context, nn types.NamespacedName, database string) *corev1.Secret {
@@ -152,14 +165,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
-			controllerReconciler := &LogicalReplicationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			_, err = runReconcile(ctx, typeNamespacedName)
 
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -169,14 +176,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
-			controllerReconciler := &LogicalReplicationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			_, err = runReconcile(ctx, typeNamespacedName)
 
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -186,14 +187,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
-			controllerReconciler := &LogicalReplicationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			result, err := runReconcile(ctx, typeNamespacedName)
 
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeTrue())
 		})
@@ -204,14 +199,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
-			controllerReconciler := &LogicalReplicationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			result, err := runReconcile(ctx, typeNamespacedName)
 
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeTrue())
 
@@ -225,14 +214,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
-			controllerReconciler := &LogicalReplicationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			result, err := runReconcile(ctx, typeNamespacedName)
 
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeTrue())
 
