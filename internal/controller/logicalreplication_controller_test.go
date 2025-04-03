@@ -211,9 +211,22 @@ var _ = Describe("LogicalReplication Controller", func() {
 			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
 		})
 
-		It("should reconcile if table has different columns", func() {
-			By("remove table")
+		It("should reconcile if table has extra columns", func() {
+			By("add extra column")
 			_, err := subscriberDB.Exec("ALTER TABLE published_data.people ADD extra_column timestamp")
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Reconciling the created resource")
+			_, err = runReconcile(ctx, typeNamespacedName)
+
+			Expect(err).NotTo(HaveOccurred())
+			expectTableExists(subscriberDB, "published_data", "people", expectedPeopleColumns)
+			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
+		})
+
+		It("should reconcile if table has missing columns", func() {
+			By("drop existing column")
+			_, err := subscriberDB.Exec("ALTER TABLE published_data.cities DROP zip")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
@@ -227,6 +240,19 @@ var _ = Describe("LogicalReplication Controller", func() {
 		It("should reconcile if table does not exist", func() {
 			By("remove table")
 			_, err := subscriberDB.Exec("DROP TABLE published_data.people")
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Reconciling the created resource")
+			_, err = runReconcile(ctx, typeNamespacedName)
+
+			Expect(err).NotTo(HaveOccurred())
+			expectTableExists(subscriberDB, "published_data", "people", expectedPeopleColumns)
+			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
+		})
+
+		It("should reconcile if schema does not exist", func() {
+			By("remove schema")
+			_, err := subscriberDB.Exec("DROP SCHEMA published_data CASCADE")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
