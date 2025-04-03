@@ -1,0 +1,16 @@
+name: 🕵️ Test suite
+
+on:
+  push:
+  pull_request:
+    types: [ "opened", "synchronize", "reopened" ]
+
+jobs:
+  unit_tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run unit tests
+      run: make test
