@@ -42,6 +42,58 @@ func runReconcile(ctx context.Context, namespace types.NamespacedName) (controll
 	return result, err
 }
 
+var (
+	expectedPeopleColumns = []replication.PgTableColumn{
+		{Name: "id", Nullable: false, Type: "uuid"},
+		{Name: "name", Nullable: true, Type: "character varying", CharacterMaximumLength: sql.NullInt32{Int32: 255, Valid: true}},
+	}
+	expectedCitiesColumns = []replication.PgTableColumn{
+		{Name: "id", Nullable: false, Type: "uuid"},
+		{Name: "name", Nullable: true, Type: "character varying", CharacterMaximumLength: sql.NullInt32{Int32: 255, Valid: true}},
+		{Name: "zip", Nullable: true, Type: "character varying", CharacterMaximumLength: sql.NullInt32{Int32: 255, Valid: true}},
+		{Name: "country", Nullable: true, Type: "character varying", CharacterMaximumLength: sql.NullInt32{Int32: 255, Valid: true}},
+	}
+)
+
+func expectTableExists(db *sql.DB, schema, name string, expectedTableColumns []replication.PgTableColumn) {
+	GinkgoHelper()
+
+	rows, err := db.Query(`SELECT column_name,
+								  column_default,
+								  (is_nullable = 'YES'),
+								  data_type,
+								  character_maximum_length,
+								  numeric_precision,
+								  numeric_scale,
+								  datetime_precision
+							 FROM information_schema.columns c
+							WHERE table_schema = $1 AND table_name = $2
+							ORDER BY c.ordinal_position`,
+		schema, name)
+	Expect(err).NotTo(HaveOccurred())
+	defer rows.Close()
+
+	for _, expected := range expectedTableColumns {
+		Expect(rows.Next()).To(BeTrue(), "missing column %s, in %s.%s", expected.Name, schema, name)
+		var col replication.PgTableColumn
+		err := rows.Scan(
+			&col.Name,
+			&col.Default,
+			&col.Nullable,
+			&col.Type,
+			&col.CharacterMaximumLength,
+			&col.NumericPrecision,
+			&col.NumericScale,
+			&col.DatetimePrecision,
+		)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(col).To(Equal(expected))
+	}
+	// all rows has been checked
+	Expect(rows.Next()).To(BeFalse(), "extra column in %s.%s", schema, name)
+}
+
 func generateDbSecret(ctx context.Context, nn types.NamespacedName, database string) *corev1.Secret {
 	secret := &corev1.Secret{}
 
@@ -155,8 +207,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			expectTableExists(subscriberDB, "published_data", "people", expectedPeopleColumns)
+			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
 		})
 
 		It("should reconcile if table has different columns", func() {
@@ -168,6 +220,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			_, err = runReconcile(ctx, typeNamespacedName)
 
 			Expect(err).NotTo(HaveOccurred())
+			expectTableExists(subscriberDB, "published_data", "people", expectedPeopleColumns)
+			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
 		})
 
 		It("should reconcile if table does not exist", func() {
@@ -179,6 +233,8 @@ var _ = Describe("LogicalReplication Controller", func() {
 			_, err = runReconcile(ctx, typeNamespacedName)
 
 			Expect(err).NotTo(HaveOccurred())
+			expectTableExists(subscriberDB, "published_data", "people", expectedPeopleColumns)
+			expectTableExists(subscriberDB, "published_data", "cities", expectedCitiesColumns)
 		})
 
 		It("should fail when publication does not exist", func() {
