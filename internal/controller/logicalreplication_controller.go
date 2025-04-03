@@ -52,17 +52,17 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	err := iteration.Iterate(lr)
 	if err != nil {
-		r.setFailedStatus(lr, err)
-		err := r.Status().Update(ctx, lr)
-		return ctrl.Result{Requeue: true}, err
+		statusErr := r.setFailedStatus(ctx, lr, err)
+		return ctrl.Result{Requeue: true}, statusErr
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.LogicalReplication, err error) {
+func (r *LogicalReplicationReconciler) setFailedStatus(ctx context.Context,
+	obj *replicationv1alpha1.LogicalReplication, err error) error {
 	if err == nil {
-		return
+		return nil
 	}
 
 	var reason string
@@ -76,6 +76,9 @@ func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.
 		Message: err.Error(),
 		Reason:  reason,
 	}
+
+	patch := client.MergeFrom(obj)
+	return r.Status().Patch(ctx, obj, patch)
 }
 
 // SetupWithManager sets up the controller with the Manager.
