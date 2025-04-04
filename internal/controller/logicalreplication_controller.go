@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +17,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	replicationv1alpha1 "github.com/RedHatInsights/pg-replication-operator/api/v1alpha1"
+	"github.com/RedHatInsights/pg-replication-operator/internal/replication"
 )
 
 // LogicalReplicationReconciler reconciles a LogicalReplication object
@@ -50,17 +53,17 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	err := iteration.Iterate(lr)
 	if err != nil {
-		r.setFailedStatus(lr, err)
-		err := r.Status().Update(ctx, lr)
-		return ctrl.Result{Requeue: true}, err
+		statusErr := r.setFailedStatus(ctx, lr, err)
+		return ctrl.Result{Requeue: true}, statusErr
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.LogicalReplication, err error) {
+func (r *LogicalReplicationReconciler) setFailedStatus(ctx context.Context,
+	obj *replicationv1alpha1.LogicalReplication, err error) error {
 	if err == nil {
-		return
+		return nil
 	}
 
 	var reason string
@@ -74,6 +77,18 @@ func (r *LogicalReplicationReconciler) setFailedStatus(obj *replicationv1alpha1.
 		Message: err.Error(),
 		Reason:  reason,
 	}
+
+	type Status struct {
+		Failed  bool
+		Message string
+	}
+	type StatusPatch struct {
+		Status Status
+	}
+
+	patchBytes, _ := json.Marshal(StatusPatch{Status: Status{true, err.Error()}})
+	patch := client.RawPatch(types.MergePatchType, patchBytes)
+	return r.Status().Patch(ctx, obj, patch)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -89,8 +104,10 @@ type LogicalReplicationIteration struct {
 	Request  ctrl.Request
 	log      logr.Logger
 	obj      *replicationv1alpha1.LogicalReplication
-	pubCreds DatabaseCredentials
-	subCreds DatabaseCredentials
+	pubCreds replication.DatabaseCredentials
+	pubDB    *sql.DB
+	subCreds replication.DatabaseCredentials
+	subDB    *sql.DB
 }
 
 func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalReplication) error {
@@ -98,6 +115,39 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 	i.obj = lr
 
 	err := i.readCredentails()
+	if err != nil {
+		return err
+	}
+	err = i.connectDBs()
+	if err != nil {
+		return err
+	}
+	err = i.checkPublication()
+	if err != nil {
+		return err
+	}
+
+	tables, err := i.publicationTables()
+	if err != nil {
+		return err
+	}
+	for _, table := range tables {
+		i.log.Info("checking", table.Schema, table.Name)
+		err = i.checkSubscriptionSchema(table)
+		if err != nil {
+			return err
+		}
+		err = i.checkSubscriptionTable(table)
+		if err != nil {
+			return err
+		}
+		err = i.checkSubscriptionView(table)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = i.checkSubscription()
 	return err
 }
 
@@ -122,9 +172,95 @@ func (i *LogicalReplicationIteration) readCredentails() error {
 	return nil
 }
 
+func (i *LogicalReplicationIteration) connectDBs() error {
+	publishingDb, err := replication.DBConnect(i.pubCreds)
+	if err != nil {
+		i.log.Error(err, "connecting to publication db")
+		return NewReplicationError(ConnectError, err)
+	}
+	i.pubDB = publishingDb
+
+	i.log.Info("connected to publishing database")
+
+	subscribingDb, err := replication.DBConnect(i.subCreds)
+	if err != nil {
+		i.log.Error(err, "connecting to subscribing db")
+		return NewReplicationError(ConnectError, err)
+	}
+	i.subDB = subscribingDb
+
+	i.log.Info("connected to subscribing database")
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkPublication() error {
+	err := replication.CheckPublication(i.pubDB, i.obj.Spec.Publication.Name)
+	if err != nil {
+		i.log.Error(err, "checking publication")
+		return NewReplicationError(PublicationError, err)
+	}
+	i.log.Info("checked publications")
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) publicationTables() ([]replication.PgTable, error) {
+	tables, err := replication.PublicationTables(i.pubDB, i.obj.Spec.Publication.Name)
+	if err != nil {
+		i.log.Error(err, "checking publication tables")
+		return nil, NewReplicationError(PublicationTablesError, err)
+	}
+	i.log.Info("checked publication tables")
+
+	return tables, nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionSchema(table replication.PgTable) error {
+	err := replication.CheckSubscriptionSchema(i.subDB, table.Schema)
+	if err != nil {
+		i.log.Error(err, "checking subscription schema", "schema", table.Schema)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("checked subscription schema", "schema", table.Schema)
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionTable(table replication.PgTable) error {
+	err := replication.PublicationTableDetail(i.pubDB, &table)
+	if err != nil {
+		i.log.Error(err, "reading publication table details", table.Schema, table.Name)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("read publication table details", table.Schema, table.Name)
+
+	err = replication.CheckSubscriptionTableDetail(i.subDB, i.obj.Spec.Publication.Name, table)
+	if err != nil {
+		i.log.Error(err, "checking publication table details", table.Schema, table.Name)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("checking publication table details", table.Schema, table.Name)
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscriptionView(replication.PgTable) error {
+	return nil
+}
+
+func (i *LogicalReplicationIteration) checkSubscription() error {
+	err := replication.CheckSubscription(i.subDB, i.obj.Spec.Publication.Name, i.pubCreds)
+	if err != nil {
+		i.log.Error(err, "checking subscription")
+		return NewReplicationError(SubscriptionError, err)
+	}
+	i.log.Info("checked subscription")
+
+	return nil
+}
+
 // Get secret with database credentials by name
-func (i *LogicalReplicationIteration) getCredentialsFromSecret(secretName string) (DatabaseCredentials, error) {
-	var db DatabaseCredentials
+func (i *LogicalReplicationIteration) getCredentialsFromSecret(secretName string) (replication.DatabaseCredentials, error) {
+	var db replication.DatabaseCredentials
 	var secret corev1.Secret
 	var err error
 

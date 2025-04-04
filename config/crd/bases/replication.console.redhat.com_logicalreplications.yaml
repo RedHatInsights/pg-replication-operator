@@ -57,7 +57,7 @@ spec:
                 - secretName
                 type: object
               subscription:
-                description: SubscriptionSpec defines the datbase where the replication
+                description: SubscriptionSpec defines the database where the replication
                   would be set up.
                 properties:
                   secretName:
