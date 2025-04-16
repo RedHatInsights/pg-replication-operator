@@ -4,13 +4,19 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 func credentialsToConnectionString(credentials DatabaseCredentials) string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		credentials.Host, credentials.Port, credentials.User, credentials.Password, credentials.DatabaseName, "disable")
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		url.QueryEscape(credentials.User),
+		url.QueryEscape(credentials.Password),
+		url.QueryEscape(credentials.Host),
+		url.QueryEscape(credentials.Port),
+		url.QueryEscape(credentials.DatabaseName),
+		url.QueryEscape("disable"))
 }
 
 func DBConnect(credentials DatabaseCredentials) (*sql.DB, error) {
@@ -85,7 +91,10 @@ func CheckSubscription(db *sql.DB, name string, credentials DatabaseCredentials)
 	connStr := credentialsToConnectionString(credentials)
 	if !rows.Next() {
 		log.Printf("subscription '%s' does not exist", name)
-		sql := fmt.Sprintf(`CREATE SUBSCRIPTION "%s" CONNECTION '%s' PUBLICATION "%s" WITH (connect=false);`, name, connStr, name)
+		sql := fmt.Sprintf(`CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s WITH (connect=false)`,
+			pq.QuoteIdentifier(name),
+			pq.QuoteLiteral(connStr),
+			pq.QuoteIdentifier(name))
 		_, err = db.Exec(sql)
 		if err != nil {
 			log.Print(err)
@@ -106,12 +115,12 @@ func CheckSubscription(db *sql.DB, name string, credentials DatabaseCredentials)
 	if !subenabled ||
 		subconninfo != connStr {
 		log.Printf("subscription '%s' has wrong attributes", name)
-		_, err = db.Exec("ALTER SUBSCRIPTION " + name + " CONNECTION '" + connStr + "'")
+		_, err = db.Exec("ALTER SUBSCRIPTION " + pq.QuoteIdentifier(name) + " CONNECTION " + pq.QuoteLiteral(connStr))
 		if err != nil {
 			log.Print(err)
 			return err
 		}
-		_, err = db.Exec("ALTER SUBSCRIPTION " + name + " ENABLE")
+		_, err = db.Exec("ALTER SUBSCRIPTION " + pq.QuoteIdentifier(name) + " ENABLE")
 		if err != nil {
 			log.Print(err)
 			return err

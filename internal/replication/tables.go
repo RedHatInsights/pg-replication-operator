@@ -6,6 +6,8 @@ import (
 	"log"
 	"reflect"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 type PgTableColumn struct {
@@ -115,7 +117,7 @@ func CheckSubscriptionSchema(db *sql.DB, name string) error {
 
 	if !rows.Next() {
 		log.Printf("schema '%s' does not exist", name)
-		sql := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS "%s";`, name)
+		sql := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s`, pq.QuoteIdentifier(name))
 		_, err = db.Exec(sql)
 		if err != nil {
 			log.Print(err)
@@ -203,7 +205,7 @@ func CheckSubscriptionTableDetail(db *sql.DB, publicationName string, table PgTa
 	if !equalColumns(table.Columns, columns) {
 		log.Printf("table %s.%s differs from publication", table.Schema, table.Name)
 
-		sql := fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."%s";`, table.Schema, table.Name)
+		sql := fmt.Sprintf(`DROP TABLE IF EXISTS %s.%s`, pq.QuoteIdentifier(table.Schema), pq.QuoteIdentifier(table.Name))
 		_, err = db.Exec(sql)
 		if err != nil {
 			log.Print(err)
@@ -211,7 +213,8 @@ func CheckSubscriptionTableDetail(db *sql.DB, publicationName string, table PgTa
 		}
 
 		tableColumns := createColumns(table.Columns)
-		sql = fmt.Sprintf(`CREATE TABLE "%s"."%s" (%s);`, table.Schema, table.Name, tableColumns)
+		sql = fmt.Sprintf(`CREATE TABLE %s.%s (%s)`,
+			pq.QuoteIdentifier(table.Schema), pq.QuoteIdentifier(table.Name), tableColumns)
 		_, err = db.Exec(sql)
 		if err != nil {
 			log.Print(err)
@@ -226,7 +229,7 @@ func CheckSubscriptionTableDetail(db *sql.DB, publicationName string, table PgTa
 				return err
 			}
 
-			sql = fmt.Sprintf(`CREATE VIEW "%s"."%s" AS SELECT * FROM "%s"."%s";`,
+			sql = fmt.Sprintf(`CREATE VIEW %s.%s AS SELECT * FROM %s.%s`,
 				table.Schema, table.Name, table.Schema, tablePublicationName)
 			_, err = db.Exec(sql)
 			if err != nil {
