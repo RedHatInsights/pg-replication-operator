@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/lib/pq"
 )
@@ -11,8 +12,13 @@ import (
 var ErrWrongAttributes = errors.New("wrong attributes")
 
 func CredentialsToConnectionString(credentials DatabaseCredentials) string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		credentials.Host, credentials.Port, credentials.User, credentials.Password, credentials.DatabaseName, "disable")
+	return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
+		url.QueryEscape(credentials.User),
+		url.QueryEscape(credentials.Password),
+		url.QueryEscape(credentials.Host),
+		url.QueryEscape(credentials.Port),
+		url.QueryEscape(credentials.DatabaseName),
+		url.QueryEscape("disable"))
 }
 
 func DBConnect(credentials DatabaseCredentials) (*sql.DB, error) {
