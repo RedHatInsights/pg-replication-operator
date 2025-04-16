@@ -34,8 +34,8 @@ func DBConnect(credentials DatabaseCredentials) (*sql.DB, error) {
 
 func CheckPublication(db *sql.DB, name string) error {
 	rows, err := db.Query(`SELECT p.puballtables,
-								  (p.pubinsert and p.pubupdate and p.pubdelete and p.pubtruncate) as pubops,
-								  (select count(*) from pg_publication_namespace pn where p.oid = pn.pnpubid) as pubnamespaces
+								  (p.pubinsert AND p.pubupdate AND p.pubdelete AND p.pubtruncate) as pubops,
+								  (SELECT COUNT(*) FROM pg_publication_namespace pn WHERE p.oid = pn.pnpubid) as pubnamespaces
 							 FROM pg_publication p
 							WHERE p.pubname = $1`, name)
 	if err != nil {
