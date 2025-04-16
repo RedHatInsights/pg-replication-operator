@@ -33,7 +33,7 @@ type PgIndex struct {
 }
 
 func PublicationTables(db *sql.DB, pubname string) ([]PgTable, error) {
-	rows, err := db.Query(`SELECT n.nspname as schema, r.relname as name
+	rows, err := db.Query(`SELECT n.nspname AS schema, r.relname AS name
 							 FROM pg_publication p
 							 JOIN pg_publication_rel pr ON p.oid = pr.prpubid
 							 JOIN pg_class r ON pr.prrelid = r.oid
