@@ -16,6 +16,9 @@ type LogicalReplicationSpec struct {
 
 	//
 	Subscription SubscriptionSpec `json:"subscription"`
+
+	// schema where to put compatibility views
+	ViewSchemaName string `json:"viewSchemaName"`
 }
 
 // PublicationSpec defines the publisher connection information including

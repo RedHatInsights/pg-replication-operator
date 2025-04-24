@@ -267,3 +267,25 @@ func CheckSubscriptionTableDetail(db *sql.DB, publicationName string, table PgTa
 	}
 	return nil
 }
+
+func CheckSubscriptionView(db *sql.DB, schema string, table PgTable) error {
+	rows, err := db.Query(`SELECT true
+							 FROM pg_views v
+							 WHERE v.schemaname = $1 AND v.viewname = $2`, schema, table.Name)
+	if err != nil {
+		log.Print(err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		sql := fmt.Sprintf(`CREATE VIEW %s.%s AS SELECT * FROM %s.%s`,
+			pq.QuoteIdentifier(schema), pq.QuoteIdentifier(table.Name),
+			pq.QuoteIdentifier(table.Schema), pq.QuoteIdentifier(table.Name))
+		_, err = db.Exec(sql)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+	}
+	return nil
+}

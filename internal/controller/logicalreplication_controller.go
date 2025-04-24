@@ -233,7 +233,14 @@ func (i *LogicalReplicationIteration) checkSubscriptionTable(table replication.P
 	return nil
 }
 
-func (i *LogicalReplicationIteration) checkSubscriptionView(replication.PgTable) error {
+func (i *LogicalReplicationIteration) checkSubscriptionView(table replication.PgTable) error {
+	viewSchema := i.obj.Spec.ViewSchemaName
+	err := replication.CheckSubscriptionView(i.subDB, viewSchema, table)
+	if err != nil {
+		i.log.Error(err, "reading subscription view details", viewSchema, table.Name)
+		return NewReplicationError(SubscriptionSchemaError, err)
+	}
+	i.log.Info("read publication table details", table.Schema, table.Name)
 	return nil
 }
 
