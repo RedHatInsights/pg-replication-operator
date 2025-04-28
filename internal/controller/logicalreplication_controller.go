@@ -133,25 +133,25 @@ func (i *LogicalReplicationIteration) readCredentails() error {
 	return nil
 }
 
+func (i *LogicalReplicationIteration) connectDB(creds replication.DatabaseCredentials) (*sql.DB, error) {
+	db, err := replication.DBConnect(creds)
+	if err != nil {
+		i.log.Error(err, fmt.Sprintf("connecting to %s db", creds.DatabaseName))
+		return nil, NewReplicationError(ConnectError, err)
+	}
+	i.log.Info(fmt.Sprintf("connected to %s database", creds.DatabaseName))
+	return db, nil
+}
+
 func (i *LogicalReplicationIteration) connectDBs() error {
-	publishingDb, err := replication.DBConnect(i.pubCreds)
+	var err error
+	i.pubDB, err = i.connectDB(i.pubCreds)
 	if err != nil {
-		i.log.Error(err, "connecting to publication db")
-		return NewReplicationError(ConnectError, err)
+		return err
 	}
-	i.pubDB = publishingDb
 
-	i.log.Info("connected to publishing database")
-
-	subscribingDb, err := replication.DBConnect(i.subCreds)
-	if err != nil {
-		i.log.Error(err, "connecting to subscribing db")
-		return NewReplicationError(ConnectError, err)
-	}
-	i.subDB = subscribingDb
-
-	i.log.Info("connected to subscribing database")
-	return nil
+	i.subDB, err = i.connectDB(i.subCreds)
+	return err
 }
 
 // Get secret with database credentials by name
