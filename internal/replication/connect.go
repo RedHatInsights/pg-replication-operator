@@ -3,7 +3,6 @@ package replication
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
 )
@@ -13,11 +12,8 @@ func DBConnect(credentials DatabaseCredentials) (*sql.DB, error) {
 		credentials.Host, credentials.Port, credentials.User, credentials.Password, credentials.DatabaseName, "disable")
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return db, nil
+	return db, err
 }
