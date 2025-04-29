@@ -68,9 +68,13 @@ spec:
                 required:
                 - secretName
                 type: object
+              viewSchemaName:
+                description: schema where to put compatibility views
+                type: string
             required:
             - publication
             - subscription
+            - viewSchemaName
             type: object
           status:
             description: LogicalReplicationStatus defines the observed state of LogicalReplication
