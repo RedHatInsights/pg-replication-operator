@@ -77,6 +77,12 @@ func AlterSubscription(db *sql.DB, name string, connStr string) error {
 	return err
 }
 
+func DisableSubscription(db *sql.DB, name string) error {
+	sql := fmt.Sprintf("ALTER SUBSCRIPTION %s DISABLE", pq.QuoteIdentifier(name))
+	_, err := db.Exec(sql)
+	return err
+}
+
 func CheckSubscription(db *sql.DB, name string, connStr string) error {
 	row := db.QueryRow(`SELECT s.subenabled,
 							   s.subconninfo
