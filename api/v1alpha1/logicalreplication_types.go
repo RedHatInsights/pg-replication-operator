@@ -35,9 +35,17 @@ type SubscriptionSpec struct {
 	SecretName string `json:"secretName"`
 }
 
+// last successfully reconciled values
+type ReconciledValues struct {
+	PublicationName        string
+	PublicationSecretHash  string
+	SubscriptionSecretHash string
+}
+
 // LogicalReplicationStatus defines the observed state of LogicalReplication
 type LogicalReplicationStatus struct {
 	ReplicationStatus ReplicationStatus `json:"replicationStatus"`
+	ReconciledValues  ReconciledValues  `json:"reconciledValues"`
 }
 
 // Status of the replication
