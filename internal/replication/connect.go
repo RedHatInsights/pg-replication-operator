@@ -38,7 +38,7 @@ func CheckPublication(db *sql.DB, name string) error {
 	err := row.Scan(&puballtables, &pubops, &pubnamespaces)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			err = fmt.Errorf("publication '%s' does not exist", name)
+			return fmt.Errorf("publication '%s' does not exist", name)
 		}
 		return err
 	}
