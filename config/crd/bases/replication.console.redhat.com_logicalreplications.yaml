@@ -75,6 +75,20 @@ spec:
           status:
             description: LogicalReplicationStatus defines the observed state of LogicalReplication
             properties:
+              reconciledValues:
+                description: last successfully reconciled values
+                properties:
+                  publicationName:
+                    type: string
+                  publicationSecretHash:
+                    type: string
+                  subscriptionSecretHash:
+                    type: string
+                required:
+                - publicationName
+                - publicationSecretHash
+                - subscriptionSecretHash
+                type: object
               replicationStatus:
                 description: Status of the replication
                 properties:
@@ -91,6 +105,7 @@ spec:
                     type: string
                 type: object
             required:
+            - reconciledValues
             - replicationStatus
             type: object
         type: object

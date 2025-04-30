@@ -37,9 +37,9 @@ type SubscriptionSpec struct {
 
 // last successfully reconciled values
 type ReconciledValues struct {
-	PublicationName        string
-	PublicationSecretHash  string
-	SubscriptionSecretHash string
+	PublicationName        string `json:"publicationName"`
+	PublicationSecretHash  string `json:"publicationSecretHash"`
+	SubscriptionSecretHash string `json:"subscriptionSecretHash"`
 }
 
 // LogicalReplicationStatus defines the observed state of LogicalReplication
