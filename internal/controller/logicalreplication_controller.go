@@ -104,21 +104,23 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 	i.log = log.FromContext(i.ctx)
 	i.obj = lr
 
-	err := i.readCredentails()
-	if err != nil {
-		return err
-	}
-	err = i.connectDBs()
-	if err != nil {
-		return err
-	}
-	err = i.checkPublication()
-	if err != nil {
+	if err := i.readCredentails(); err != nil {
 		return err
 	}
 
-	err = i.checkSubscription()
-	return err
+	if err := i.connectDBs(); err != nil {
+		return err
+	}
+
+	if err := i.checkPublication(); err != nil {
+		return err
+	}
+
+	if err := i.checkSubscription(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (i *LogicalReplicationIteration) readCredentails() error {

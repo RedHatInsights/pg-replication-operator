@@ -63,10 +63,7 @@ func CreateSubscription(db *sql.DB, name string, connStr string) error {
 		pq.QuoteLiteral(connStr),
 		pq.QuoteIdentifier(name))
 	_, err := db.Exec(sql)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func AlterSubscription(db *sql.DB, name string, connStr string) error {
@@ -77,10 +74,7 @@ func AlterSubscription(db *sql.DB, name string, connStr string) error {
 	}
 	sql = fmt.Sprintf("ALTER SUBSCRIPTION %s ENABLE", pq.QuoteIdentifier(name))
 	_, err = db.Exec(sql)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func CheckSubscription(db *sql.DB, name string, connStr string) error {
