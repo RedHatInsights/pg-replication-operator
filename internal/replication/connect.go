@@ -2,19 +2,21 @@ package replication
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 
 	"github.com/lib/pq"
 )
 
-func credentialsToConnectionString(credentials DatabaseCredentials) string {
+var ErrWrongAttributes = errors.New("wrong attributes")
+
+func CredentialsToConnectionString(credentials DatabaseCredentials) string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		credentials.Host, credentials.Port, credentials.User, credentials.Password, credentials.DatabaseName, "disable")
 }
 
 func DBConnect(credentials DatabaseCredentials) (*sql.DB, error) {
-	connStr := credentialsToConnectionString(credentials)
+	connStr := CredentialsToConnectionString(credentials)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
@@ -49,8 +51,7 @@ func CheckPublication(db *sql.DB, name string) error {
 	if puballtables ||
 		!pubops ||
 		pubnamespaces > 0 {
-		err := fmt.Errorf("publication '%s' has wrong attributes", name)
-		return err
+		return ErrWrongAttributes
 	}
 
 	return nil
@@ -65,7 +66,6 @@ func CreateSubscription(db *sql.DB, name string, connStr string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("subscription '%s' created", name)
 	return nil
 }
 
@@ -80,11 +80,10 @@ func AlterSubscription(db *sql.DB, name string, connStr string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("subscription '%s' updated", name)
 	return nil
 }
 
-func CheckSubscription(db *sql.DB, name string, credentials DatabaseCredentials) error {
+func CheckSubscription(db *sql.DB, name string, connStr string) error {
 	row := db.QueryRow(`SELECT s.subenabled,
 							   s.subconninfo
 						  FROM pg_subscription s
@@ -94,28 +93,15 @@ func CheckSubscription(db *sql.DB, name string, credentials DatabaseCredentials)
 		subconninfo string
 	)
 
-	connStr := credentialsToConnectionString(credentials)
 	err := row.Scan(&subenabled, &subconninfo)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			err = CreateSubscription(db, name, connStr)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
+		return err
 	}
 
 	// subscription should be enabled
 	// and have correct connection info
-	if !subenabled ||
-		subconninfo != connStr {
-		log.Printf("subscription '%s' has wrong attributes", name)
-		err = AlterSubscription(db, name, connStr)
-		if err != nil {
-			return err
-		}
+	if !subenabled || subconninfo != connStr {
+		return ErrWrongAttributes
 	}
 
 	return nil

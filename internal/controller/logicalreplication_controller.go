@@ -175,12 +175,34 @@ func (i *LogicalReplicationIteration) checkPublication() error {
 }
 
 func (i *LogicalReplicationIteration) checkSubscription() error {
-	err := replication.CheckSubscription(i.subDB, i.obj.Spec.Publication.Name, i.pubCreds)
+	connStr := replication.CredentialsToConnectionString(i.pubCreds)
+	name := i.obj.Spec.Publication.Name
+
+	err := replication.CheckSubscription(i.subDB, name, connStr)
 	if err != nil {
-		i.log.Error(err, "checking subscription")
-		return NewReplicationError(SubscriptionError, err)
+		switch err {
+		case sql.ErrNoRows:
+			err = replication.CreateSubscription(i.subDB, name, connStr)
+			if err != nil {
+				i.log.Error(err, "recreating", "subscription", name)
+				return NewReplicationError(SubscriptionError, err)
+			}
+			i.log.Info("created", "subscription", name)
+
+		case replication.ErrWrongAttributes:
+			i.log.Info("wrong attributes", "subscription", name)
+			err = replication.AlterSubscription(i.subDB, name, connStr)
+			if err != nil {
+				i.log.Error(err, "altering", "subscription", name)
+				return NewReplicationError(SubscriptionError, err)
+			}
+
+		default:
+			i.log.Error(err, "checking", "subscription", name)
+			return NewReplicationError(SubscriptionError, err)
+		}
 	}
-	i.log.Info("checked subscription")
+	i.log.Info("checked", "subscription", name)
 
 	return nil
 }
