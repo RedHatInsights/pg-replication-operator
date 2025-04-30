@@ -116,6 +116,10 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 		return err
 	}
 
+	if err := i.disableSubscriptionIfPublicationChanged(); err != nil {
+		return err
+	}
+
 	if err := i.checkSubscription(); err != nil {
 		return err
 	}
@@ -172,6 +176,30 @@ func (i *LogicalReplicationIteration) checkPublication() error {
 		return NewReplicationError(PublicationError, err)
 	}
 	i.log.Info("checked publications")
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) disableSubscriptionIfPublicationChanged() error {
+	oldName := i.obj.Status.ReconciledValues.PublicationName
+	if i.obj.Spec.Publication.Name == oldName || oldName == "" {
+		return nil
+	}
+
+	if err := replication.CheckSubscription(i.subDB, oldName, ""); err != nil {
+		if err == sql.ErrNoRows {
+			i.log.Error(err, "old subscription does not exist", "subscription", oldName)
+			return nil
+		}
+		i.log.Error(err, "checking", "subscription", oldName)
+		return NewReplicationError(SubscriptionError, err)
+	}
+
+	if err := replication.DisableSubscription(i.subDB, oldName); err != nil {
+		i.log.Error(err, "disabling", "subscription", oldName)
+		return NewReplicationError(SubscriptionError, err)
+	}
+	i.log.Info("disabled", "subscription", oldName)
 
 	return nil
 }
