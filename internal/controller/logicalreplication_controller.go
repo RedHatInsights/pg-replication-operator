@@ -104,21 +104,27 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 	i.log = log.FromContext(i.ctx)
 	i.obj = lr
 
-	err := i.readCredentails()
-	if err != nil {
-		return err
-	}
-	err = i.connectDBs()
-	if err != nil {
-		return err
-	}
-	err = i.checkPublication()
-	if err != nil {
+	if err := i.readCredentails(); err != nil {
 		return err
 	}
 
-	err = i.checkSubscription()
-	return err
+	if err := i.connectDBs(); err != nil {
+		return err
+	}
+
+	if err := i.checkPublication(); err != nil {
+		return err
+	}
+
+	if err := i.disableSubscriptionIfPublicationChanged(); err != nil {
+		return err
+	}
+
+	if err := i.checkSubscription(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (i *LogicalReplicationIteration) readCredentails() error {
@@ -170,6 +176,22 @@ func (i *LogicalReplicationIteration) checkPublication() error {
 		return NewReplicationError(PublicationError, err)
 	}
 	i.log.Info("checked publications")
+
+	return nil
+}
+
+func (i *LogicalReplicationIteration) disableSubscriptionIfPublicationChanged() error {
+	oldName := i.obj.Status.ReconciledValues.PublicationName
+	if i.obj.Spec.Publication.Name == oldName {
+		return nil
+	}
+
+	err := replication.DisableSubscription(i.subDB, oldName)
+	if err != nil {
+		i.log.Error(err, "disabling", "subscription", oldName)
+		return NewReplicationError(SubscriptionError, err)
+	}
+	i.log.Info("disabled", "subscription", oldName)
 
 	return nil
 }
