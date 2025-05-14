@@ -100,7 +100,7 @@ func CheckSubscription(db *sql.DB, name string, connStr string) error {
 
 	// subscription should be enabled
 	// and have correct connection info
-	if !subenabled || subconninfo != connStr {
+	if !subenabled || (connStr != "" && subconninfo != connStr) {
 		return ErrWrongAttributes
 	}
 
