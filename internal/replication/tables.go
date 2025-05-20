@@ -59,23 +59,21 @@ func PublicationTables(db *sql.DB, pubname string) ([]PgTable, error) {
 	return tables, nil
 }
 
-func PublicationTableDetail(db *sql.DB, table *PgTable) error {
-	rows, err := db.Query(`SELECT column_name,
-								  column_default,
-								  (is_nullable = 'YES'),
-								  data_type,
-								  character_maximum_length,
-								  numeric_precision,
-								  numeric_scale,
-								  datetime_precision
-							 FROM information_schema.columns c
-							 JOIN pg_publication_tables pt
-							   ON c.table_schema = pt.schemaname
-							  AND c.table_name = pt.tablename
-							  AND c.column_name = ANY(pt.attnames)
-							WHERE table_schema = $1 AND table_name = $2
-							ORDER BY c.ordinal_position`,
-		table.Schema, table.Name)
+func tableColumns(db *sql.DB, table *PgTable, sqlJoin string) error {
+	sql := fmt.Sprintf(`SELECT column_name,
+							   column_default,
+							  (is_nullable = 'YES'),
+							  data_type,
+							  character_maximum_length,
+							  numeric_precision,
+							  numeric_scale,
+							  datetime_precision
+						 FROM information_schema.columns c
+						 %s
+						WHERE c.table_schema = $1 AND c.table_name = $2
+						ORDER BY c.ordinal_position`,
+		sqlJoin)
+	rows, err := db.Query(sql, table.Schema, table.Name)
 	if err != nil {
 		return err
 	}
@@ -102,6 +100,13 @@ func PublicationTableDetail(db *sql.DB, table *PgTable) error {
 
 	table.Columns = columns
 	return nil
+}
+
+func PublicationTableDetail(db *sql.DB, table *PgTable) error {
+	return tableColumns(db, table, `JOIN pg_publication_tables pt
+                                      ON c.table_schema = pt.schemaname
+                                     AND c.table_name = pt.tablename
+                                     AND c.column_name = ANY(pt.attnames)`)
 }
 
 func CreateSubscriptionSchema(db *sql.DB, name string) error {
@@ -172,43 +177,17 @@ func RenameSubscriptionTable(db *sql.DB, publicationName string, table PgTable) 
 }
 
 func CheckSubscriptionTableDetail(db *sql.DB, table PgTable) error {
-	rows, err := db.Query(`SELECT column_name,
-								  column_default,
-								  (is_nullable = 'YES'),
-								  data_type,
-								  character_maximum_length,
-								  numeric_precision,
-								  numeric_scale,
-								  datetime_precision
-							 FROM information_schema.columns c
-							WHERE table_schema = $1 AND table_name = $2
-							ORDER BY c.ordinal_position`,
-		table.Schema, table.Name)
+	subscriptionTable := PgTable{
+		Schema: table.Schema,
+		Name:   table.Name,
+	}
+
+	err := tableColumns(db, &subscriptionTable, "")
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
-	columns := make([]PgTableColumn, 0)
-	for rows.Next() {
-		var col PgTableColumn
-		err := rows.Scan(
-			&col.Name,
-			&col.Default,
-			&col.Nullable,
-			&col.Type,
-			&col.CharacterMaximumLength,
-			&col.NumericPrecision,
-			&col.NumericScale,
-			&col.DatetimePrecision,
-		)
-		if err != nil {
-			return err
-		}
-		columns = append(columns, col)
-	}
-
-	if !equalColumns(table.Columns, columns) {
+	if !equalColumns(table.Columns, subscriptionTable.Columns) {
 		return ErrWrongAttributes
 	}
 	return nil
