@@ -140,7 +140,7 @@ func equalColumns(a, b []PgTableColumn) bool {
 func createColumns(columns []PgTableColumn) string {
 	columnDefs := make([]string, len(columns))
 	for i, col := range columns {
-		columnDefs[i] = col.Name + " " + col.Type
+		columnDefs[i] = pq.QuoteIdentifier(col.Name) + " " + col.Type
 		if col.CharacterMaximumLength.Valid {
 			columnDefs[i] += fmt.Sprintf(" (%d)", col.CharacterMaximumLength.Int32)
 		}
