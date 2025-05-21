@@ -21,8 +21,12 @@ type PgTableColumn struct {
 }
 
 type PgTable struct {
-	Schema  string
-	Name    string
+	Schema string `json:"schema"`
+	Name   string `json:"name"`
+}
+
+type PgTableDetail struct {
+	PgTable
 	Columns []PgTableColumn
 }
 
@@ -59,7 +63,7 @@ func PublicationTables(db *sql.DB, pubname string) ([]PgTable, error) {
 	return tables, nil
 }
 
-func tableColumns(db *sql.DB, table *PgTable, sqlJoin string) error {
+func tableColumns(db *sql.DB, table PgTable, sqlJoin string) (PgTableDetail, error) {
 	sql := fmt.Sprintf(`SELECT column_name,
 							   column_default,
 							  (is_nullable = 'YES'),
@@ -73,9 +77,10 @@ func tableColumns(db *sql.DB, table *PgTable, sqlJoin string) error {
 						WHERE c.table_schema = $1 AND c.table_name = $2
 						ORDER BY c.ordinal_position`,
 		sqlJoin)
+	tableDetail := PgTableDetail{}
 	rows, err := db.Query(sql, table.Schema, table.Name)
 	if err != nil {
-		return err
+		return tableDetail, err
 	}
 	defer rows.Close()
 
@@ -93,16 +98,18 @@ func tableColumns(db *sql.DB, table *PgTable, sqlJoin string) error {
 			&col.DatetimePrecision,
 		)
 		if err != nil {
-			return err
+			return tableDetail, err
 		}
 		columns = append(columns, col)
 	}
 
-	table.Columns = columns
-	return nil
+	tableDetail.Schema = table.Schema
+	tableDetail.Name = table.Name
+	tableDetail.Columns = columns
+	return tableDetail, nil
 }
 
-func PublicationTableDetail(db *sql.DB, table *PgTable) error {
+func PublicationTableDetail(db *sql.DB, table PgTable) (PgTableDetail, error) {
 	return tableColumns(db, table, `JOIN pg_publication_tables pt
                                       ON c.table_schema = pt.schemaname
                                      AND c.table_name = pt.tablename
@@ -160,7 +167,7 @@ func createColumns(columns []PgTableColumn) string {
 	return strings.Join(columnDefs, ", ")
 }
 
-func CreateSubscriptionTable(db *sql.DB, table PgTable) error {
+func CreateSubscriptionTable(db *sql.DB, table PgTableDetail) error {
 	tableColumns := createColumns(table.Columns)
 	sql := fmt.Sprintf(`CREATE TABLE %s.%s (%s)`,
 		pq.QuoteIdentifier(table.Schema), pq.QuoteIdentifier(table.Name), tableColumns)
@@ -176,13 +183,8 @@ func RenameSubscriptionTable(db *sql.DB, publicationName string, table PgTable) 
 	return err
 }
 
-func CheckSubscriptionTableDetail(db *sql.DB, table PgTable) error {
-	subscriptionTable := PgTable{
-		Schema: table.Schema,
-		Name:   table.Name,
-	}
-
-	err := tableColumns(db, &subscriptionTable, "")
+func CheckSubscriptionTableDetail(db *sql.DB, table PgTableDetail) error {
+	subscriptionTable, err := tableColumns(db, PgTable{Schema: table.Schema, Name: table.Name}, "")
 	if err != nil {
 		return err
 	}
