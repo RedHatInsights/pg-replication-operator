@@ -84,10 +84,23 @@ spec:
                     type: string
                   subscriptionSecretHash:
                     type: string
+                  tables:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        schema:
+                          type: string
+                      required:
+                      - name
+                      - schema
+                      type: object
+                    type: array
                 required:
                 - publicationName
                 - publicationSecretHash
                 - subscriptionSecretHash
+                - tables
                 type: object
               replicationStatus:
                 description: Status of the replication

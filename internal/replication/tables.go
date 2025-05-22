@@ -131,6 +131,15 @@ func CheckSubscriptionSchema(db *sql.DB, name string) error {
 	return err
 }
 
+func CheckSubscriptionTable(db *sql.DB, table PgTable) error {
+	row := db.QueryRow(`SELECT true
+						  FROM pg_tables
+						 WHERE schemaname = $1 AND tablename = $2`, table.Schema, table.Name)
+	var exists bool
+	err := row.Scan(&exists)
+	return err
+}
+
 func equalColumns(a, b []PgTableColumn) bool {
 	if len(a) != len(b) {
 		return false
@@ -175,10 +184,10 @@ func CreateSubscriptionTable(db *sql.DB, table PgTableDetail) error {
 	return err
 }
 
-func RenameSubscriptionTable(db *sql.DB, publicationName string, table PgTable) error {
+func RenameSubscriptionTable(db *sql.DB, table, newTable PgTable) error {
 	sql := fmt.Sprintf(`ALTER TABLE IF EXISTS %s.%s RENAME TO %s`,
 		pq.QuoteIdentifier(table.Schema), pq.QuoteIdentifier(table.Name),
-		pq.QuoteIdentifier(table.Name+"_"+publicationName))
+		pq.QuoteIdentifier(newTable.Name))
 	_, err := db.Exec(sql)
 	return err
 }
