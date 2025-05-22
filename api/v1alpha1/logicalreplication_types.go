@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"github.com/RedHatInsights/pg-replication-operator/internal/replication"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -37,9 +38,10 @@ type SubscriptionSpec struct {
 
 // last successfully reconciled values
 type ReconciledValues struct {
-	PublicationName        string `json:"publicationName"`
-	PublicationSecretHash  string `json:"publicationSecretHash"`
-	SubscriptionSecretHash string `json:"subscriptionSecretHash"`
+	PublicationName        string                `json:"publicationName"`
+	PublicationSecretHash  string                `json:"publicationSecretHash"`
+	SubscriptionSecretHash string                `json:"subscriptionSecretHash"`
+	Tables                 []replication.PgTable `json:"tables"`
 }
 
 // LogicalReplicationStatus defines the observed state of LogicalReplication
