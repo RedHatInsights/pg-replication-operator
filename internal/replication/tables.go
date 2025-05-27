@@ -63,7 +63,14 @@ func PublicationTables(db *sql.DB, pubname string) ([]PgTable, error) {
 	return tables, nil
 }
 
-func tableColumns(db *sql.DB, table PgTable, sqlJoin string) (PgTableDetail, error) {
+func tableColumns(db *sql.DB, table PgTable, joinPublication bool) (PgTableDetail, error) {
+	sqlJoin := ""
+	if joinPublication {
+		sqlJoin = `JOIN pg_publication_tables pt
+                     ON c.table_schema = pt.schemaname
+                    AND c.table_name = pt.tablename
+                    AND c.column_name = ANY(pt.attnames)`
+	}
 	sql := fmt.Sprintf(`SELECT column_name,
 							   column_default,
 							  (is_nullable = 'YES'),
@@ -110,10 +117,7 @@ func tableColumns(db *sql.DB, table PgTable, sqlJoin string) (PgTableDetail, err
 }
 
 func PublicationTableDetail(db *sql.DB, table PgTable) (PgTableDetail, error) {
-	return tableColumns(db, table, `JOIN pg_publication_tables pt
-                                      ON c.table_schema = pt.schemaname
-                                     AND c.table_name = pt.tablename
-                                     AND c.column_name = ANY(pt.attnames)`)
+	return tableColumns(db, table, true)
 }
 
 func CreateSubscriptionSchema(db *sql.DB, name string) error {
@@ -193,7 +197,7 @@ func RenameSubscriptionTable(db *sql.DB, table, newTable PgTable) error {
 }
 
 func CheckSubscriptionTableDetail(db *sql.DB, table PgTableDetail) error {
-	subscriptionTable, err := tableColumns(db, PgTable{Schema: table.Schema, Name: table.Name}, "")
+	subscriptionTable, err := tableColumns(db, PgTable{Schema: table.Schema, Name: table.Name}, false)
 	if err != nil {
 		return err
 	}
