@@ -156,13 +156,16 @@ func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalRep
 			return nil, err
 		}
 
-		if err = i.checkSubscriptionView(table); err != nil {
-			return nil, err
-		}
 	}
 
 	if err := i.checkSubscription(); err != nil {
 		return nil, err
+	}
+
+	for _, table := range tables {
+		if err = i.checkSubscriptionView(table); err != nil {
+			return nil, err
+		}
 	}
 
 	values := i.currentValues(tables)
@@ -374,6 +377,11 @@ func (i *LogicalReplicationIteration) checkSubscription() error {
 
 		default:
 			i.log.Error(err, "checking", "subscription", name)
+			return NewReplicationError(SubscriptionError, err)
+		}
+		err = replication.EnableSubscription(i.subDB, name, connStr)
+		if err != nil {
+			i.log.Error(err, "enabling", "subscription", name)
 			return NewReplicationError(SubscriptionError, err)
 		}
 	}
