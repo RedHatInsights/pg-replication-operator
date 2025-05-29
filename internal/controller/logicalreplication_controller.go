@@ -50,10 +50,15 @@ func (r *LogicalReplicationReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	iteration := NewLogicalReplicationIteration(r.Client, ctx, req)
 
-	err := iteration.Iterate(lr)
+	currentValues, err := iteration.Iterate(lr)
 	if err != nil {
 		statusErr := r.setFailedStatus(ctx, lr, err)
 		return ctrl.Result{Requeue: true}, statusErr
+	}
+
+	err = r.setReconciledValues(ctx, lr, currentValues)
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -81,6 +86,16 @@ func (r *LogicalReplicationReconciler) setFailedStatus(ctx context.Context,
 	return r.Status().Patch(ctx, obj, patch)
 }
 
+func (r *LogicalReplicationReconciler) setReconciledValues(ctx context.Context,
+	obj *replicationv1alpha1.LogicalReplication, values *replicationv1alpha1.ReconciledValues) error {
+	if values == nil {
+		return nil
+	}
+	obj.Status.ReconciledValues = *values
+	patch := client.MergeFrom(obj)
+	return r.Status().Patch(ctx, obj, patch)
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *LogicalReplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -100,56 +115,61 @@ type LogicalReplicationIteration struct {
 	subDB    *sql.DB
 }
 
-func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalReplication) error {
+func (i *LogicalReplicationIteration) Iterate(lr *replicationv1alpha1.LogicalReplication) (
+	*replicationv1alpha1.ReconciledValues, error) {
 	i.log = log.FromContext(i.ctx)
 	i.obj = lr
 
 	if err := i.readCredentails(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := i.connectDBs(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := i.checkPublication(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if i.publicationChanged() {
 		if err := i.renameTables(); err != nil {
-			return err
+			return nil, err
 		}
 
 		if err := i.disableOldSubscription(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	tables, err := i.publicationTables()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, table := range tables {
 
 		if err = i.checkSubscriptionSchema(table); err != nil {
-			return err
+			return nil, err
 		}
 
 		if err = i.checkSubscriptionTable(table); err != nil {
-			return err
+			return nil, err
 		}
 
-		if err = i.checkSubscriptionView(table); err != nil {
-			return err
-		}
 	}
 
 	if err := i.checkSubscription(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	for _, table := range tables {
+		if err = i.checkSubscriptionView(table); err != nil {
+			return nil, err
+		}
+	}
+
+	values := i.currentValues(tables)
+	return values, nil
 }
 
 func (i *LogicalReplicationIteration) readCredentails() error {
@@ -359,10 +379,26 @@ func (i *LogicalReplicationIteration) checkSubscription() error {
 			i.log.Error(err, "checking", "subscription", name)
 			return NewReplicationError(SubscriptionError, err)
 		}
+		err = replication.EnableSubscription(i.subDB, name, connStr)
+		if err != nil {
+			i.log.Error(err, "enabling", "subscription", name)
+			return NewReplicationError(SubscriptionError, err)
+		}
 	}
 	i.log.Info("checked", "subscription", name)
 
 	return nil
+}
+
+func (i *LogicalReplicationIteration) currentValues(tables []replication.PgTable) *replicationv1alpha1.ReconciledValues {
+	values := replicationv1alpha1.ReconciledValues{
+		PublicationName:        i.obj.Spec.Publication.Name,
+		PublicationSecretHash:  replication.Checksum(replication.CredentialsToConnectionString(i.pubCreds)),
+		SubscriptionSecretHash: replication.Checksum(replication.CredentialsToConnectionString(i.subCreds)),
+		Tables:                 tables,
+	}
+
+	return &values
 }
 
 // Get secret with database credentials by name
