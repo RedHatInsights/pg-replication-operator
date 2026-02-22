@@ -73,12 +73,23 @@ func CreateSubscription(db *sql.DB, name string, connStr string) error {
 }
 
 func AlterSubscription(db *sql.DB, name string, connStr string) error {
-	sql := fmt.Sprintf("ALTER SUBSCRIPTION %s CONNECTION %s", pq.QuoteIdentifier(name), pq.QuoteLiteral(connStr))
+	sql := fmt.Sprintf("ALTER SUBSCRIPTION %s DISABLE", pq.QuoteIdentifier(name))
 	_, err := db.Exec(sql)
 	if err != nil {
 		return err
 	}
-	sql = fmt.Sprintf("ALTER SUBSCRIPTION %s ENABLE", pq.QuoteIdentifier(name))
+	sql = fmt.Sprintf("ALTER SUBSCRIPTION %s CONNECTION %s", pq.QuoteIdentifier(name), pq.QuoteLiteral(connStr))
+	_, err = db.Exec(sql)
+	return err
+}
+
+func EnableSubscription(db *sql.DB, name string, connStr string) error {
+	sql := fmt.Sprintf("ALTER SUBSCRIPTION %s ENABLE", pq.QuoteIdentifier(name))
+	_, err := db.Exec(sql)
+	if err != nil {
+		return err
+	}
+	sql = fmt.Sprintf("ALTER SUBSCRIPTION %s REFRESH PUBLICATION", pq.QuoteIdentifier(name))
 	_, err = db.Exec(sql)
 	return err
 }
